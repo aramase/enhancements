@@ -1,0 +1,21 @@
+title: KMS Observability
+kep-number: 3130
+authors:
+  - "@aramase"
+owning-sig: sig-auth
+participating-sigs:
+  - sig-auth
+status: provisional
+creation-date: 2022-01-12
+reviewers:
+  - "@enj"
+  - "@ritazh"
+approvers:
+  - "@enj"
+  - "@ritazh"
+stage: alpha
+latest-milestone: "v1.24"
+milestone:
+  alpha: "v1.24"
+  beta: "v1.25"
+  stable: "v1.26"
