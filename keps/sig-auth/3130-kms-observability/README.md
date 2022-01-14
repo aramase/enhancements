@@ -195,7 +195,7 @@ No.
 
 ###### How does this feature react if the API server and/or etcd is unavailable?
 
-- Secret data encryption with external kms-plugin is unavailable
+- ETCD data encryption with external kms-plugin is unavailable
 
 ## Implementation History
 
@@ -222,3 +222,4 @@ We considered using the AuditID from the kube-apiserver request that generated t
 
 1. AuditID can be configured by the user with the `Audit-ID` header in the API server request. Multiple requests can be sent to the kube-apiserver with the same Audit-ID.
 2. Not all API server requests will generate an envelope operation. The API server caches DEKs and for the DEK that's available in the cache, the kube-apiserver will not generate an envelope operation.
+3. Since not all calls to the KMS correspond to an audit log, using audit ID is not complete for correlating calls from kube-apiserver->kms-plugin->KMS.
