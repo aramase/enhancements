@@ -109,6 +109,8 @@ type DecryptRequest struct {
 The UID generated in the kube-apiserver will be used:
 
 1. For logging in the kube-apiserver. All envelope operations to the kms-plugin will be logged with the corresponding UID.
+   1. The UID will be logged using a wrapper in the kube-apiserver to ensure that the UID is logged in the same format and is always logged.
+   2. In addition to the UID, the kube-apiserver will also log non-sensitive metadata such as name, namespace and GroupVersionResource of the object that triggered the envelope operation.
 2. Sent to the kms-plugin as part of the `EncryptRequest` and `DecryptRequest` structs.
 
 ### Test Plan
