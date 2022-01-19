@@ -74,14 +74,14 @@ required) or even code snippets. If there's any ambiguity about HOW your
 proposal will be implemented, this is the place to discuss them.
 -->
 
-This design is centered around generating a new UID for each envelope operation similar to UID generation in admission review requests here: https://github.com/kubernetes/kubernetes/blob/release-1.20/staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/request/admissionreview.go#L137.
+This design is centered around generating a new UID for each envelope operation similar to UID generation in admission review requests here: https://github.com/kubernetes/kubernetes/blob/e9e669aa6037c380469b45200e59cff9b52d6d68/staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/request/admissionreview.go#L137.
 
 A new field will be added to the `EncryptRequest` and `DecryptRequest` structs in the kms-plugin interface.
 
 ```go
 type EncryptRequest struct {
 	// UID is a unique identifier for the request.
-	UID string `protobuf:"bytes,1,opt,name=uid,proto3" json:"uid,omitempty"`
+	UID string `protobuf:"bytes,3,opt,name=uid,proto3" json:"uid,omitempty"`
 	// Version of the KMS plugin API.
 	Version string `protobuf:"bytes,1,opt,name=version,proto3" json:"version,omitempty"`
 	// The data to be encrypted.
@@ -95,7 +95,7 @@ type EncryptRequest struct {
 ```go
 type DecryptRequest struct {
 	// UID is a unique identifier for the request.
-	UID string `protobuf:"bytes,1,opt,name=uid,proto3" json:"uid,omitempty"`
+	UID string `protobuf:"bytes,3,opt,name=uid,proto3" json:"uid,omitempty"`
 	// Version of the KMS plugin API.
 	Version string `protobuf:"bytes,1,opt,name=version,proto3" json:"version,omitempty"`
 	// The data to be decrypted.
@@ -139,7 +139,7 @@ Pick one of these and delete the rest.
 
 ###### Does enabling the feature change any default behavior?
 
-No change in the default behavior.
+UID sent as part of the envelope operation is a change in the default behavior. This is backwards compatible.
 
 ###### Can the feature be disabled once it has been enabled (i.e. can we roll back the enablement)?
 
@@ -183,7 +183,7 @@ No.
 
 ###### Will enabling / using this feature result in increasing size or count of the existing API objects?
 
-No.
+This proposal adds a new field `UID` to the gRPC API for envelope operations.
 
 ###### Will enabling / using this feature result in increasing time taken by any operations covered by existing SLIs/SLOs?
 
