@@ -10,7 +10,7 @@ updates.
 
 To get started with this template:
 
-- [ ] **Pick a hosting SIG.**
+- [x] **Pick a hosting SIG.**
   Make sure that the problem space is something the SIG is interested in taking
   up. KEPs should not be checked in without a sponsoring SIG.
 - [ ] **Create an issue in kubernetes/enhancements**
@@ -65,7 +65,7 @@ If none of those approvers are still appropriate, then changes to that list
 should be approved by the remaining approvers and/or the owning SIG (or
 SIG Architecture for cross-cutting KEPs).
 -->
-# KEP-NNNN: Your short, descriptive title
+# KEP-5793: Manifest Based Admission Control Config
 
 <!--
 This is the title of your KEP. Keep it short, simple, and descriptive. A good
@@ -173,6 +173,11 @@ useful for a wide audience.
 A good summary is probably at least a paragraph in length.
 -->
 
+This KEP proposes adding file-based manifests to the kube-apiserver to configure admission webhooks
+and policies on startup.
+These policies would exist outside of the API, enabling operators and platforms to implement
+policies that themselves restrict further (API-based) admission policies / webhooks.
+
 ## Motivation
 
 <!--
@@ -184,6 +189,10 @@ demonstrate the interest in a KEP within the wider Kubernetes community.
 [experience reports]: https://github.com/golang/go/wiki/ExperienceReports
 -->
 
+Currently there is no good way to ensure an admission webhook / policy is enforced on startup.
+TODO: Elaborate...
+
+
 ### Goals
 
 <!--
@@ -191,12 +200,35 @@ List the specific goals of the KEP. What is it trying to achieve? How will we
 know that this has succeeded?
 -->
 
+1. Guarantee file-configured admission policies and webhooks are active before
+api-server begins processing requests.
+2. Enable platform-operator level admission policies that cannot be bypassed.
+I.E. Manifest-based admission control can intercept API-based admission control 
+resources (VAP/MAP/VAPB/MAPB/VWC/MWC).
+3. Manifest based admission control files MAY be updated. The kube-apiserver will watch for file
+changes and reload the admission control when files change and are read/validated successfully.
+
+
 ### Non-Goals
 
 <!--
 What is out of scope for this KEP? Listing non-goals helps to focus discussion
 and make progress.
 -->
+
+1. Synchronization of file based resource information across apiservers will not be supported. 
+For control planes running multiple instances of the apiserver, each apiserver must be configured
+individually.
+2. No support for Validating Admission Policy / Mutating Admission Policy param objects
+(i.e. paramKind).
+3. No Service references in admission webhooks. Only URLs are supported.
+4. Manifest based admission control resources are not visible through the API.
+  - These resources cannot be controlled through the API by-design, may not be sychronized between
+  API-servers, and the closest analogue – static / mirror pods – have been error-prone.
+5. Webhooks will only use statically configured credentials (e.g. kubeConfigFile). 
+If we later add the ability to use service account credentials or cluster-trust-bundles for
+webhooks, this manifest based admission control won't support it.
+
 
 ## Proposal
 
@@ -208,6 +240,9 @@ implementation. What is the desired outcome and how do we measure success?.
 The "Design Details" section below is for the real
 nitty-gritty.
 -->
+
+
+
 
 ### User Stories (Optional)
 
@@ -231,6 +266,8 @@ Go in to as much detail as necessary here.
 This might be a good place to talk about core concepts and how they relate.
 -->
 
+
+
 ### Risks and Mitigations
 
 <!--
@@ -245,6 +282,8 @@ How will UX be reviewed, and by whom?
 Consider including folks who also work outside the SIG or subproject.
 -->
 
+
+
 ## Design Details
 
 <!--
@@ -253,6 +292,9 @@ change are understandable. This may include API specs (though not always
 required) or even code snippets. If there's any ambiguity about HOW your
 proposal will be implemented, this is the place to discuss them.
 -->
+
+
+
 
 ### Test Plan
 
@@ -267,7 +309,7 @@ when drafting this test plan.
 [testing-guidelines]: https://git.k8s.io/community/contributors/devel/sig-testing/testing.md
 -->
 
-[ ] I/we understand the owners of the involved components may require updates to
+[x] I/we understand the owners of the involved components may require updates to
 existing tests to make this code solid enough prior to committing the changes necessary
 to implement this enhancement.
 
@@ -277,6 +319,12 @@ to implement this enhancement.
 Based on reviewers feedback describe what additional tests need to be added prior
 implementing this enhancement to ensure the enhancements have also solid foundations.
 -->
+
+We expect this feature to be primarily covered via integration tests.
+Since this feature is fully contained within kube-apiserver and does not propose
+any additional user-facing APIs, e2e tests are not appropriate.
+Since this feature primarily involves the admission chain, unit tests will not
+be sufficient.
 
 ##### Unit tests
 
@@ -492,15 +540,9 @@ well as the [existing list] of feature gates.
 [existing list]: https://kubernetes.io/docs/reference/command-line-tools-reference/feature-gates/
 -->
 
-- [ ] Feature gate (also fill in values in `kep.yaml`)
-  - Feature gate name:
-  - Components depending on the feature gate:
-- [ ] Other
-  - Describe the mechanism:
-  - Will enabling / disabling the feature require downtime of the control
-    plane?
-  - Will enabling / disabling the feature require downtime or reprovisioning
-    of a node?
+- [x] Feature gate (also fill in values in `kep.yaml`)
+  - Feature gate name: `AdmissionControlManifest`
+  - Components depending on the feature gate: `kube-apiserver`
 
 ###### Does enabling the feature change any default behavior?
 
@@ -508,6 +550,8 @@ well as the [existing list] of feature gates.
 Any change of default behavior may be surprising to users or break existing
 automations, so be extremely careful here.
 -->
+
+No, enabling the feature does not change any default behavior.
 
 ###### Can the feature be disabled once it has been enabled (i.e. can we roll back the enablement)?
 
@@ -522,7 +566,12 @@ feature.
 NOTE: Also set `disable-supported` to `true` or `false` in `kep.yaml`.
 -->
 
+Yes, the feature can be disabled once it has been enabled. The configured
+admission webhooks / policies will no longer apply.
+
 ###### What happens if we reenable the feature if it was previously rolled back?
+
+The configured admission webhooks / policies will apply again.
 
 ###### Are there any tests for feature enablement/disablement?
 
@@ -538,6 +587,8 @@ feature gate after having objects written with the new field) are also critical.
 You can take a look at one potential example of such test in:
 https://github.com/kubernetes/kubernetes/pull/97058/files#diff-7826f7adbc1996a05ab52e3f5f02429e94b68ce6bce0dc534d1be636154fded3R246-R282
 -->
+
+
 
 ### Rollout, Upgrade and Rollback Planning
 
@@ -577,6 +628,8 @@ are missing a bunch of machinery and tooling and can't do that now.
 <!--
 Even if applying deprecation policies, they may still surprise some users.
 -->
+
+No.
 
 ### Monitoring Requirements
 
@@ -674,6 +727,8 @@ and creating new ones, as well as about cluster-level services (e.g. DNS):
       - Impact of its degraded performance or high-error rates on the feature:
 -->
 
+No. Only the user-configured webhooks, if any. Otherwise this feature is contained to API server.
+
 ### Scalability
 
 <!--
@@ -701,6 +756,8 @@ Focusing mostly on:
     heartbeats, leader election, etc.)
 -->
 
+No.
+
 ###### Will enabling / using this feature result in introducing new API types?
 
 <!--
@@ -710,13 +767,17 @@ Describe them, providing:
   - Supported number of objects per namespace (for namespace-scoped objects)
 -->
 
+It will result in new component-configuration-only fields/types. No REST API objects.
+
 ###### Will enabling / using this feature result in any new calls to the cloud provider?
 
 <!--
 Describe them, providing:
   - Which API(s):
   - Estimated increase:
--->
+→
+
+No, it will not.
 
 ###### Will enabling / using this feature result in increasing size or count of the existing API objects?
 
@@ -726,6 +787,8 @@ Describe them, providing:
   - Estimated increase in size: (e.g., new annotation of size 32B)
   - Estimated amount of new objects: (e.g., new Object X for every existing Pod)
 -->
+
+No, it will not.
 
 ###### Will enabling / using this feature result in increasing time taken by any operations covered by existing SLIs/SLOs?
 
@@ -738,6 +801,8 @@ Think about adding additional work or introducing new steps in between
 [existing SLIs/SLOs]: https://git.k8s.io/community/sig-scalability/slos/slos.md#kubernetes-slisslos
 -->
 
+Only to the extent that any configured policies do so.
+
 ###### Will enabling / using this feature result in non-negligible increase of resource usage (CPU, RAM, disk, IO, ...) in any components?
 
 <!--
@@ -748,7 +813,10 @@ This through this both in small and large cases, again with respect to the
 [supported limits].
 
 [supported limits]: https://git.k8s.io/community//sig-scalability/configs-and-limits/thresholds.md
--->
+→
+
+No. API server usage for the feature itself for the configuration should be minimal, configured admission policies may
+consume resources but not differently from existing, API based configuration.
 
 ###### Can enabling / using this feature result in resource exhaustion of some node resources (PIDs, sockets, inodes, etc.)?
 
@@ -761,6 +829,16 @@ If any of the resources can be exhausted, how this is mitigated with the existin
 Are there any tests that were run/should be run to understand performance characteristics better
 and validate the declared limits?
 -->
+
+It shouldn’t.
+
+API server will monitor additional files as configured by the user in this feature.
+
+On the host running API server, resource usage will be proportional to the configured
+Admission policies.
+
+Poorly configured policies could cause issues, but they can actually be mitigated even if the API
+is not responsive because they are inherently managed through a side-channel (on disk). 
 
 ### Troubleshooting
 
@@ -776,6 +854,9 @@ details). For now, we leave it here.
 -->
 
 ###### How does this feature react if the API server and/or etcd is unavailable?
+
+This feature is contained in the API server so it can’t react to API server unavailability.
+This feature does not depend on etcd, all config / objects are self-contained local to the API server instance.
 
 ###### What are other known failure modes?
 
@@ -821,6 +902,8 @@ not need to be as detailed as the proposal, but should include enough
 information to express the idea and why it was not acceptable.
 -->
 
+
+
 ## Infrastructure Needed (Optional)
 
 <!--
@@ -828,3 +911,5 @@ Use this section if you need things from the project/SIG. Examples include a
 new subproject, repos requested, or GitHub details. Listing these here allows a
 SIG to get the process for these resources started right away.
 -->
+
+None.
